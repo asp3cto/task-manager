@@ -1,0 +1,308 @@
+openapi: 3.0.3
+info:
+  title: Task Manager API
+  description: |
+    REST API для управления задачами на Go с использованием гексагональной архитектуры.
+    
+  version: 1.0.0
+  contact:
+    name: Task Manager API
+    url: https://github.com/asp3cto/task-manager
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+security: []
+
+paths:
+  /tasks:
+    get:
+      summary: Получить список всех задач
+      description: |
+        Возвращает список всех задач с опциональной фильтрацией по статусу.
+        Если параметр status не указан, возвращаются все задачи.
+      operationId: getTasks
+      tags:
+        - tasks
+      parameters:
+        - name: status
+          in: query
+          description: Фильтр по статусу задачи
+          required: false
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+          example: pending
+      responses:
+        '200':
+          description: Список задач успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+              examples:
+                empty_list:
+                  summary: Пустой список
+                  value: []
+                tasks_list:
+                  summary: Список задач
+                  value:
+                    - id: "1a2b3c4d5e6f7g8h"
+                      title: "Выполнить задачу"
+                      description: "Описание задачи"
+                      status: "pending"
+                      created_at: "2023-12-01T10:00:00Z"
+                      updated_at: "2023-12-01T10:00:00Z"
+                    - id: "2b3c4d5e6f7g8h9i"
+                      title: "Другая задача"
+                      description: "Другое описание"
+                      status: "completed"
+                      created_at: "2023-12-01T11:00:00Z"
+                      updated_at: "2023-12-01T12:00:00Z"
+        '400':
+          description: Некорректный параметр запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "invalid status parameter"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "internal server error"
+
+    post:
+      summary: Создать новую задачу
+      description: |
+        Создает новую задачу с указанным заголовком и описанием.
+        Задача автоматически получает уникальный ID и статус "pending".
+      operationId: createTask
+      tags:
+        - tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+            examples:
+              simple_task:
+                summary: Простая задача
+                value:
+                  title: "Изучить Go"
+                  description: "Изучить основы языка Go и создать простое API"
+              detailed_task:
+                summary: Детальная задача
+                value:
+                  title: "Разработать API"
+                  description: "Создать REST API для управления задачами с использованием гексагональной архитектуры"
+      responses:
+        '201':
+          description: Задача успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: "1a2b3c4d5e6f7g8h"
+                title: "Изучить Go"
+                description: "Изучить основы языка Go и создать простое API"
+                status: "pending"
+                created_at: "2023-12-01T10:00:00Z"
+                updated_at: "2023-12-01T10:00:00Z"
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_title:
+                  summary: Отсутствует заголовок
+                  value:
+                    error: "title is required"
+                invalid_format:
+                  summary: Некорректный формат JSON
+                  value:
+                    error: "invalid request format"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "internal server error"
+
+  /tasks/{id}:
+    get:
+      summary: Получить задачу по ID
+      description: |
+        Возвращает конкретную задачу по её уникальному идентификатору.
+      operationId: getTaskById
+      tags:
+        - tasks
+      parameters:
+        - name: id
+          in: path
+          description: Уникальный идентификатор задачи
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+            minLength: 32
+            maxLength: 32
+          example: "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+      responses:
+        '200':
+          description: Задача успешно найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                title: "Выполнить задачу"
+                description: "Описание задачи"
+                status: "pending"
+                created_at: "2023-12-01T10:00:00Z"
+                updated_at: "2023-12-01T10:00:00Z"
+        '404':
+          description: Задача не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "task not found"
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "internal server error"
+
+components:
+  schemas:
+    Task:
+      type: object
+      description: Основная сущность для представления задачи в системе
+      required:
+        - id
+        - title
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор задачи (32-символьная hex-строка)
+          pattern: '^[a-f0-9]{32}$'
+          minLength: 32
+          maxLength: 32
+          example: "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        title:
+          type: string
+          description: Краткое название или резюме задачи
+          minLength: 1
+          maxLength: 255
+          example: "Выполнить задачу"
+        description:
+          type: string
+          description: Подробная информация о том, что включает в себя задача
+          maxLength: 1000
+          example: "Описание задачи с деталями выполнения"
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        created_at:
+          type: string
+          format: date-time
+          description: Временная метка создания задачи (ISO 8601)
+          example: "2023-12-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Временная метка последнего обновления задачи (ISO 8601)
+          example: "2023-12-01T10:00:00Z"
+
+    TaskStatus:
+      type: string
+      description: Текущее состояние задачи в её жизненном цикле
+      enum:
+        - pending
+        - in_progress
+        - completed
+        - cancelled
+      example: pending
+      x-enum-descriptions:
+        pending: Ожидает выполнения - задача создана, но работа над ней не начата
+        in_progress: В процессе выполнения - над задачей ведется активная работа
+        completed: Завершена - задача успешно выполнена
+        cancelled: Отменена - задача была остановлена до завершения
+
+    CreateTaskRequest:
+      type: object
+      description: Запрос для создания новой задачи
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: Краткое название или резюме задачи
+          minLength: 1
+          maxLength: 255
+          example: "Изучить Go"
+        description:
+          type: string
+          description: Подробная информация о задаче (опционально)
+          maxLength: 1000
+          example: "Изучить основы языка Go и создать простое API"
+
+    ErrorResponse:
+      type: object
+      description: Стандартный формат ответа для ошибок
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Сообщение об ошибке для клиента
+          example: "task not found"
+
+  examples:
+    PendingTask:
+      summary: Задача в ожидании
+      value:
+        id: "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        title: "Изучить Go"
+        description: "Изучить основы языка Go"
+        status: "pending"
+        created_at: "2023-12-01T10:00:00Z"
+        updated_at: "2023-12-01T10:00:00Z"
+
+    CompletedTask:
+      summary: Завершенная задача
+      value:
+        id: "2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q"
+        title: "Создать API"
+        description: "REST API для управления задачами"
+        status: "completed"
+        created_at: "2023-12-01T09:00:00Z"
+        updated_at: "2023-12-01T15:30:00Z"
+
+tags:
+  - name: tasks
+    description: Операции для управления задачами
+
+externalDocs:
+  description: GitHub репозиторий проекта
+  url: https://github.com/asp3cto/task-manager
