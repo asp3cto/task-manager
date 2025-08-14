@@ -3,9 +3,11 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/asp3cto/task-manager/internal/domain"
+	"github.com/asp3cto/task-manager/internal/logger"
 	"github.com/asp3cto/task-manager/internal/ports"
 )
 
@@ -13,12 +15,14 @@ import (
 // It translates HTTP requests into service calls and formats responses.
 type TaskHandler struct {
 	service ports.TaskService
+	logger  logger.Logger
 }
 
 // NewTaskHandler creates a new HTTP handler for task operations.
-func NewTaskHandler(service ports.TaskService) *TaskHandler {
+func NewTaskHandler(service ports.TaskService, logger logger.Logger) *TaskHandler {
 	return &TaskHandler{
 		service: service,
+		logger:  logger,
 	}
 }
 
@@ -60,15 +64,20 @@ var (
 // Supports optional status query parameter for filtering tasks by status.
 // Returns a JSON array of tasks or an error response.
 func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	status := r.URL.Query().Get("status")
+	h.logger.Info(ctx, "getting tasks", slog.String("status_filter", status))
 
 	if status != "" && !domain.IsValidStatus(status) {
+		h.logger.Warn(ctx, "invalid status parameter", slog.String("status", status))
 		h.writeError(w, ErrInvalidStatus, http.StatusBadRequest)
 		return
 	}
 
 	tasks, err := h.service.GetAllTasks(r.Context(), status)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get tasks", slog.String("error", err.Error()))
 		h.writeError(w, ErrInternalServerError, http.StatusInternalServerError)
 		return
 	}
@@ -79,8 +88,13 @@ func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 // GetTask handles GET /tasks/{id} requests to retrieve a specific task by ID.
 // Returns the task as JSON or a 404 error if the task doesn't exist.
 func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	taskID := r.PathValue("id")
+	h.logger.Info(ctx, "getting task by ID", slog.String("task_id", taskID))
+
 	if taskID == "" {
+		h.logger.Warn(ctx, "empty task ID in request")
 		h.writeError(w, ErrTaskNotFound, http.StatusNotFound)
 		return
 	}
@@ -88,8 +102,10 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 	task, err := h.service.GetTaskByID(r.Context(), taskID)
 	if err != nil {
 		if errors.Is(err, domain.ErrTaskNotFound) {
+			h.logger.Warn(ctx, "task not found", slog.String("task_id", taskID))
 			h.writeError(w, ErrTaskNotFound, http.StatusNotFound)
 		} else {
+			h.logger.Error(ctx, "failed to get task", slog.String("task_id", taskID), slog.String("error", err.Error()))
 			h.writeError(w, ErrInternalServerError, http.StatusInternalServerError)
 		}
 
@@ -103,17 +119,25 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 // Expects a JSON payload with title and description fields.
 // Returns the created task with a generated ID and pending status.
 func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	h.logger.Info(ctx, "creating new task")
+
 	var req CreateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Warn(ctx, "invalid request format", slog.String("error", err.Error()))
 		h.writeError(w, ErrInvalidRequestFormat, http.StatusBadRequest)
 		return
 	}
 
+	h.logger.Debug(ctx, "parsed create task request", slog.String("title", req.Title))
 	task, err := h.service.CreateTask(r.Context(), req.Title, req.Description)
 	if err != nil {
 		if errors.Is(err, domain.ErrEmptyTitle) {
+			h.logger.Warn(ctx, "task creation failed: empty title")
 			h.writeError(w, ErrTitleRequired, http.StatusBadRequest)
 		} else {
+			h.logger.Error(ctx, "failed to create task", slog.String("error", err.Error()))
 			h.writeError(w, ErrInternalServerError, http.StatusInternalServerError)
 		}
 		return

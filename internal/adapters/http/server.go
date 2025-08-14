@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/asp3cto/task-manager/internal/logger"
 	"github.com/asp3cto/task-manager/internal/ports"
 )
 
@@ -23,8 +24,8 @@ type Server struct {
 const readHeaderTimeout = 2 * time.Second
 
 // NewServer creates a new HTTP server instance with task management endpoints.
-func NewServer(addr string, service ports.TaskService) *Server {
-	handler := NewTaskHandler(service)
+func NewServer(addr string, service ports.TaskService, logger logger.Logger) *Server {
+	handler := NewTaskHandler(service, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /tasks", handler.GetTasks)

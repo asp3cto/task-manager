@@ -13,6 +13,7 @@ import (
 	httpAdapter "github.com/asp3cto/task-manager/internal/adapters/http"
 	"github.com/asp3cto/task-manager/internal/adapters/repository"
 	"github.com/asp3cto/task-manager/internal/core/service"
+	"github.com/asp3cto/task-manager/internal/logger"
 )
 
 // shutdownDelay defines the maximum time to wait for graceful shutdown.
@@ -20,17 +21,20 @@ import (
 const shutdownDelay = 30 * time.Second
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	addr := os.Getenv("ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 
-	repo := repository.NewMemoryTaskRepository()
-	taskService := service.NewTaskService(repo)
-	server := httpAdapter.NewServer(addr, taskService)
+	asyncLogger := logger.NewFromEnv(os.Stdout)
+	asyncLogger.Start(ctx)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	repo := repository.NewMemoryTaskRepository()
+	taskService := service.NewTaskService(repo, asyncLogger)
+	server := httpAdapter.NewServer(addr, taskService, asyncLogger)
 
 	go func() {
 		log.Printf("server starting on %s", server.Addr())
@@ -40,14 +44,17 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	log.Println("received shutdown signal, shutting down gracefully")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownDelay)
 	defer cancel()
 
+	log.Println("received shutdown signal, shutting down gracefully")
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Println("server forced to shutdown: ", err)
+		log.Printf("server forced to shutdown: %v", err)
 	}
 
 	log.Println("server exited")
+
+	asyncLogger.Close()
 }
