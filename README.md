@@ -129,14 +129,14 @@ curl -X POST http://localhost:8080/tasks \
 
 ## Логирование
 
-Приложение и*спользует асинхронную систему логирования с JSON-форматом вывода.
+Приложение использует асинхронную систему логирования с JSON-форматом вывода.
 
 ### Конфигурация через переменные окружения
 
 - `LOG_LEVEL` - уровень логирования (DEBUG, INFO, WARN, ERROR). По умолчанию: INFO
 - `LOG_BUFFER_SIZE` - размер буфера для очереди логов. По умолчанию: 100
 
-### Пример логов*
+### Пример логов
 ```json
 {"time":"2023-12-01T10:00:00Z","level":"INFO","message":"server starting","addr":":8080"}
 {"time":"2023-12-01T10:00:05Z","level":"DEBUG","message":"task created successfully","task_id":"1a2b3c4d5e6f7g8h","title":"New Task"}
